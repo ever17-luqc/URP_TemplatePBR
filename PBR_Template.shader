@@ -7,6 +7,11 @@ Shader "Ever17_PBR/PBR_Template"
         [Foldout]_SurfaceOpFoldout("Surface Options",Float)=1
         [if(_SurfaceOpFoldout)] [Enum(UnityEngine.Rendering.CullMode)]_CullMode("Render Face",Float)=0
         [if(_SurfaceOpFoldout)][SurfaceType][Enum(Opaque,0,Transparent,1)]_Surface("Surface Type",Int)=1
+        [HideInInspector]_SrcBlend("_SrcBlend",float)=1
+        [HideInInspector]_DstBlend("_DstBlend", Float) = 0.0
+        [HideInInspector]_ZWrite("_ZWrite", Float) = 1.0
+        [if(_SurfaceOpFoldout)][Toggle(_ALPHATEST_ON)]_AlphaCut("Alpha Test Cut",Float)=0
+        [if(_SurfaceOpFoldout)][HideSwitch(_AlphaCut)]_Cutoff("Cut off value",Range(0,1))=0.5
     //Surface input Props   
         [Foldout]_SurfaceIpFoldout("Surface Inputs",Float)=1
         [if(_SurfaceIpFoldout)][NoScaleOffset][SingleLine]_BaseTexture ("Base Texture(Diffuse Texture)", 2D) = "white" {}
@@ -65,6 +70,8 @@ Shader "Ever17_PBR/PBR_Template"
 
 
             Cull [_CullMode] 
+            Blend [_SrcBlend][_DstBlend]
+            ZWrite [_ZWrite]
 
 
             HLSLPROGRAM
@@ -72,6 +79,7 @@ Shader "Ever17_PBR/PBR_Template"
             #pragma fragment frag
 
             //shader feature 
+            #pragma shader_feature_local_fragment _ALPHATEST_ON
             #pragma shader_feature _NORMALMAP
             #pragma shader_feature AMR_MAP
             #pragma shader_feature EMISSION_ON
@@ -99,6 +107,101 @@ Shader "Ever17_PBR/PBR_Template"
            
             ENDHLSL
         }
+
+       //shadow caster
+       Pass
+        {
+            Name "ShadowCaster"
+            Tags{"LightMode" = "ShadowCaster"}
+
+            ZWrite On
+            ZTest LEqual
+            ColorMask 0
+            Cull[_CullMode]
+
+            HLSLPROGRAM
+            #pragma exclude_renderers gles gles3 glcore
+            #pragma target 4.5
+
+            // -------------------------------------
+            // Material Keywords
+            #pragma shader_feature_local_fragment _ALPHATEST_ON
+            #pragma shader_feature_local_fragment _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
+
+            //--------------------------------------
+            // GPU Instancing
+            #pragma multi_compile_instancing
+            #pragma multi_compile _ DOTS_INSTANCING_ON
+
+            #pragma vertex MyShadowPassVertex
+            #pragma fragment MyShadowPassFragment
+
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/ShadowCasterPass.hlsl"
+            half4 _Tint;
+            
+            TEXTURE2D(_BaseTexture);                    SAMPLER(sampler_BaseTexture);
+
+
+            Varyings MyShadowPassVertex(Attributes input)
+            {
+                Varyings output;
+                UNITY_SETUP_INSTANCE_ID(input);
+
+                output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
+                output.positionCS = GetShadowPositionHClip(input);
+                return output;
+            }
+
+            half4 MyShadowPassFragment(Varyings input) : SV_TARGET
+            {
+                Alpha(SampleAlbedoAlpha(input.uv, TEXTURE2D_ARGS(_BaseTexture, sampler_BaseTexture)).a, _Tint, _Cutoff);
+                return 0;
+            }
+            ENDHLSL
+        }
+
+
+        Pass
+        {
+            Name "DepthOnly"
+            Tags{"LightMode" = "DepthOnly"}
+
+            ZWrite On
+            ColorMask 0
+            Cull[_CullMode]
+
+            HLSLPROGRAM
+            #pragma exclude_renderers gles gles3 glcore
+            #pragma target 4.5
+
+            #pragma vertex DepthOnlyVertex
+            #pragma fragment MyDepthOnlyFragment
+
+            // -------------------------------------
+            // Material Keywords
+            #pragma shader_feature_local_fragment _ALPHATEST_ON
+            //#pragma shader_feature_local_fragment _SMOOTHNESS_TEXTURE_ALBEDO_CHANNEL_A
+
+            //--------------------------------------
+            // GPU Instancing
+            #pragma multi_compile_instancing
+            #pragma multi_compile _ DOTS_INSTANCING_ON
+
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/LitInput.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/Shaders/DepthOnlyPass.hlsl"
+            half _Tint;
+            TEXTURE2D(_BaseTexture);                    SAMPLER(sampler_BaseTexture);
+            half4 MyDepthOnlyFragment(Varyings input) : SV_TARGET
+            {
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+
+                Alpha(SampleAlbedoAlpha(input.uv, TEXTURE2D_ARGS(_BaseTexture, sampler_BaseTexture)).a, _Tint, _Cutoff);
+                return 0;
+            }
+            ENDHLSL
+        }
+
     }
     CustomEditor "UniversalShaderGUI"
 }

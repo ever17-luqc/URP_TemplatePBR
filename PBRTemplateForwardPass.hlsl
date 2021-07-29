@@ -54,6 +54,8 @@
 
              //CBuffer---------------------Start
             CBUFFER_START(UnityPerMaterial)
+            half _Surface;
+            half _Cutoff;
                 //******base Prop*******//
             half4 _Tint;
             float4 _GlobalTilingAndOffset;
@@ -122,7 +124,7 @@
             inline void InitializePBRTemplateSurfaceData(float2 uv,out PBRTemplateSurfaceData surfaceData)
             {
                    half4 albedo = SAMPLE_TEXTURE2D(_BaseTexture,sampler_BaseTexture,uv);
-                    surfaceData.alpha =albedo.a;
+                    surfaceData.alpha =albedo.a*_Tint.a;
 
                     half4 AMR = SAMPLE_TEXTURE2D(_AOMetallicRoughnessMap, sampler_AOMetallicRoughnessMap,uv);
                     surfaceData.albedo = albedo.rgb ;
@@ -223,7 +225,10 @@
                 half4 color = CustomUniversalFragmentPBR(inputData, surfaceData);
                  
                 
-                color.a = 1;
+                color.a =_Surface==0?1:surfaceData.alpha ;
+                #ifdef _ALPHATEST_ON
+                clip(surfaceData.alpha-_Cutoff);
+                #endif 
 
                 return color;
             }

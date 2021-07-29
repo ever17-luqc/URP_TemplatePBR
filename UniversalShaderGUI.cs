@@ -386,13 +386,19 @@ public class UniversalShaderGUI : ShaderGUI
                             {
                                 material.SetOverrideTag("RenderType", "Opaque");
                                 material.renderQueue =(int) RenderQueue.Geometry;
-
-                            }
+                                material.SetFloat("_SrcBlend", (float)BlendMode.One);
+                                material.SetFloat("_DstBlend", (float)BlendMode.Zero);
+                                material.SetFloat("_ZWrite", 1.0f);
+                        
+                    }
                             else
                             {
                                 material.SetOverrideTag("RenderType", "Transparent");
                                 material.renderQueue = (int)RenderQueue.Transparent;
-                            }
+                                material.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+                                material.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
+                                material.SetFloat("_ZWrite", 0); 
+                    }
                                
                         
                     }
